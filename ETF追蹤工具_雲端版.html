@@ -209,7 +209,16 @@ document.getElementById('statusDot').classList.add('connected');
 document.getElementById('statusText').textContent = '已連線至雲端';
 
 // 模式切換
+const ADMIN_PWD = '0010506';
+
 window.setMode = function(mode) {
+  if(mode === 'admin'){
+    const pwd = prompt('請輸入管理密碼：');
+    if(pwd !== ADMIN_PWD){
+      alert('密碼錯誤！');
+      return;
+    }
+  }
   curMode = mode;
   document.getElementById('btnView').classList.toggle('active', mode === 'view');
   document.getElementById('btnAdmin').classList.toggle('active', mode === 'admin');
