@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>主動型 ETF 持股追蹤看板</title>
+<style>
+  :root {
+    --bg: #f7f6f3;
+    --surface: #ffffff;
+    --border: #e5e3dc;
+    --border-strong: #ccc9c0;
+    --text: #1a1a18;
+    --text-muted: #6b6960;
+    --text-faint: #9c9a92;
+    --blue: #185FA5;
+    --blue-light: #e8f1fb;
+    --green: #0F6E56;
+    --green-light: #e1f5ee;
+    --red: #A32D2D;
+    --red-light: #fcebeb;
+    --amber: #854F0B;
+    --amber-light: #faeeda;
+    --radius: 10px;
+    --radius-sm: 6px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'PingFang TC', 'Microsoft JhengHei', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+  .container { max-width: 900px; margin: 0 auto; padding: 2rem 1rem; }
+  .top-row { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 1.5rem; }
+  .top-left h1 { font-size: 22px; font-weight: 600; margin-bottom: 4px; }
+  .top-left p { font-size: 13px; color: var(--text-muted); }
+  .top-right { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .status-dot { width: 8px; height: 8px; border-radius: 50%; background: #ccc; display: inline-block; margin-right: 4px; }
+  .status-dot.connected { background: var(--green); }
+  .status-text { font-size: 12px; color: var(--text-muted); }
+
+  .disclaimer { background: #fffbf0; border: 1px solid #e8d88a; border-radius: var(--radius-sm); padding: 10px 14px; margin-bottom: 1.25rem; }
+  .disclaimer-title { font-size: 13px; font-weight: 600; color: #7a6200; margin-bottom: 4px; }
+  .disclaimer-body { font-size: 12px; color: #7a6200; line-height: 1.6; }
+
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.25rem; margin-bottom: 1rem; }
+  .card-title { font-size: 13px; font-weight: 600; color: var(--text-muted); margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.05em; }
+
+  .mode-toggle { display: flex; gap: 8px; margin-bottom: 1rem; }
+  .mode-btn { padding: 8px 20px; border-radius: 20px; border: 1px solid var(--border-strong); background: var(--surface); color: var(--text-muted); font-size: 13px; cursor: pointer; }
+  .mode-btn.active { background: var(--text); border-color: var(--text); color: white; }
+
+  .etf-tabs { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 1.25rem; }
+  .etf-tab { padding: 6px 14px; border-radius: 20px; border: 1px solid var(--border-strong); background: var(--surface); color: var(--text-muted); font-size: 13px; cursor: pointer; transition: all 0.15s; }
+  .etf-tab:hover { border-color: var(--blue); color: var(--blue); }
+  .etf-tab.active { background: var(--blue); border-color: var(--blue); color: white; }
+
+  .upload-area { border: 2px dashed var(--border-strong); border-radius: var(--radius-sm); padding: 2rem; text-align: center; cursor: pointer; transition: all 0.15s; background: var(--bg); }
+  .upload-area:hover { border-color: var(--blue); background: var(--blue-light); }
+  .upload-area.dragover { border-color: var(--blue); background: var(--blue-light); }
+  .upload-label { font-size: 14px; color: var(--text-muted); margin-bottom: 6px; }
+  .upload-hint { font-size: 12px; color: var(--text-faint); }
+  .upload-filename { font-size: 13px; color: var(--green); font-weight: 500; margin-top: 8px; }
+  input[type=file] { display: none; }
+
+  .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 10px; }
+  input[type=date] { padding: 8px 12px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--surface); color: var(--text); font-size: 13px; outline: none; }
+
+  button { padding: 8px 18px; border-radius: var(--radius-sm); border: 1px solid var(--border-strong); background: var(--surface); color: var(--text); font-size: 13px; cursor: pointer; transition: all 0.15s; white-space: nowrap; }
+  button:hover { background: var(--bg); }
+  button:disabled { opacity: 0.5; cursor: not-allowed; }
+  button.primary { background: var(--blue); border-color: var(--blue); color: white; }
+  button.primary:hover { background: #0c447c; }
+  button.sm { padding: 4px 10px; font-size: 12px; }
+
+  .msg { padding: 8px 12px; border-radius: var(--radius-sm); font-size: 13px; margin-top: 8px; }
+  .msg.ok { background: var(--green-light); color: var(--green); }
+  .msg.err { background: var(--red-light); color: var(--red); }
+
+  .saved-item { display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; background: var(--bg); border-radius: var(--radius-sm); margin-bottom: 6px; font-size: 13px; }
+  .saved-date { font-weight: 600; }
+  .saved-info { color: var(--text-muted); font-size: 12px; margin-left: 8px; }
+
+  .compare-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  select { padding: 8px 12px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--surface); color: var(--text); font-size: 13px; outline: none; }
+
+  .result-header { font-size: 15px; font-weight: 600; margin-bottom: 14px; padding-bottom: 10px; border-bottom: 1px solid var(--border); }
+  .summary-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 1.25rem; }
+  .scard { background: var(--bg); border-radius: var(--radius-sm); padding: 12px; text-align: center; }
+  .scard-label { font-size: 11px; color: var(--text-muted); margin-bottom: 6px; }
+  .scard-val { font-size: 24px; font-weight: 700; }
+
+  .group-label { display: inline-block; font-size: 12px; font-weight: 600; padding: 3px 10px; border-radius: 20px; margin-bottom: 8px; }
+  .label-new { background: var(--blue-light); color: var(--blue); }
+  .label-buy { background: var(--green-light); color: var(--green); }
+  .label-sell { background: var(--red-light); color: var(--red); }
+  .label-clear { background: var(--amber-light); color: var(--amber); }
+
+  table { width: 100%; border-collapse: collapse; font-size: 13px; margin-bottom: 16px; }
+  th { text-align: left; padding: 6px 10px; font-size: 11px; font-weight: 600; color: var(--text-muted); border-bottom: 1px solid var(--border); text-transform: uppercase; letter-spacing: 0.04em; }
+  td { padding: 7px 10px; border-bottom: 1px solid var(--border); }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: var(--bg); }
+
+  .c-blue { color: var(--blue); font-weight: 600; }
+  .c-green { color: var(--green); font-weight: 600; }
+  .c-red { color: var(--red); font-weight: 600; }
+  .c-amber { color: var(--amber); font-weight: 600; }
+  .c-muted { color: var(--text-muted); }
+  .empty { color: var(--text-faint); font-size: 13px; text-align: center; padding: 2rem; }
+  .loading { text-align: center; padding: 2rem; color: var(--text-muted); font-size: 13px; }
+  .admin-only { display: none; }
+  .admin-only.visible { display: block; }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <div class="top-row">
+    <div class="top-left">
+      <h1>主動型 ETF 持股追蹤看板 <span style="font-size:16px;color:var(--blue)">(Premium)</span></h1>
+      <p>由馬克設計開發 ｜ 跨平台數據整合分析</p>
+    </div>
+    <div class="top-right">
+      <span class="status-dot" id="statusDot"></span>
+      <span class="status-text" id="statusText">連線中...</span>
+    </div>
+  </div>
+
+  <!-- 免責聲明 -->
+  <div class="disclaimer">
+    <div class="disclaimer-title">【免責聲明】</div>
+    <div class="disclaimer-body">本工具數據已力求精準，惟實際資訊仍以各投信官網公告為準。<br>本資料僅供參考，不構成任何投資邀約或建議，投資人應獨立判斷並自負盈虧。</div>
+  </div>
+
+  <!-- 模式切換 -->
+  <div class="mode-toggle">
+    <button class="mode-btn active" id="btnView" onclick="setMode('view')">查詢模式（客戶）</button>
+    <button class="mode-btn" id="btnAdmin" onclick="setMode('admin')">管理模式（後台）</button>
+  </div>
+
+  <!-- 管理模式 -->
+  <div class="admin-only" id="adminPanel">
+    <div class="card">
+      <div class="card-title" id="inputTitle">上傳 00981A 持股 CSV</div>
+      <div class="etf-tabs" id="etfTabs">
+        <button class="etf-tab active" onclick="switchETF('00981A','統一台股增長',this)">00981A 統一</button>
+        <button class="etf-tab" onclick="switchETF('00982A','群益台灣強棒',this)">00982A 群益</button>
+      </div>
+
+      <div class="upload-area" id="uploadArea" onclick="document.getElementById('csvFile').click()"
+        ondragover="event.preventDefault();this.classList.add('dragover')"
+        ondragleave="this.classList.remove('dragover')"
+        ondrop="handleDrop(event)">
+        <div class="upload-label">點擊上傳 CSV 檔案，或拖拉至此</div>
+        <div class="upload-hint">格式：名稱、權重、股數（Gemini 產出的格式）</div>
+        <div class="upload-filename" id="uploadFilename"></div>
+      </div>
+      <input type="file" id="csvFile" accept=".csv" onchange="handleFileSelect(event)">
+
+      <div class="row">
+        <input type="date" id="dateInput">
+        <button class="primary" onclick="saveData()" id="saveBtn">上傳資料到雲端</button>
+        <button onclick="clearUpload()">清除</button>
+      </div>
+      <div id="saveMsg"></div>
+    </div>
+  </div>
+
+  <!-- ETF 選擇（查詢模式） -->
+  <div id="viewETFTabs" class="etf-tabs">
+    <button class="etf-tab active" onclick="switchViewETF('00981A','統一台股增長',this)">00981A 統一</button>
+    <button class="etf-tab" onclick="switchViewETF('00982A','群益台灣強棒',this)">00982A 群益</button>
+  </div>
+
+  <!-- 已儲存資料 -->
+  <div class="card">
+    <div class="card-title">已有資料 — <span id="etfLabel">00981A 統一台股增長</span></div>
+    <div id="savedList"><div class="loading">載入中...</div></div>
+  </div>
+
+  <!-- 比對 -->
+  <div class="card">
+    <div class="card-title">選擇兩筆資料進行比對</div>
+    <div class="compare-row">
+      <select id="selA"><option value="">舊資料（基期）</option></select>
+      <span class="c-muted">→</span>
+      <select id="selB"><option value="">新資料（比較）</option></select>
+      <button class="primary" onclick="compare()">開始比對</button>
+    </div>
+  </div>
+
+  <div id="resultArea"></div>
+</div>
+
+<script type="module">
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
+import { getFirestore, collection, doc, setDoc, getDocs, deleteDoc, query, orderBy } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+
+const firebaseConfig = {
+  apiKey: "AIzaSyDYgMjnJfWgVNEVitOAvR-O-4MPAgLHDS8",
+  authDomain: "etf-trade-61ac0.firebaseapp.com",
+  projectId: "etf-trade-61ac0",
+  storageBucket: "etf-trade-61ac0.firebasestorage.app",
+  messagingSenderId: "223861995411",
+  appId: "1:223861995411:web:e946e86a4ffc85ebc45a66"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
+const ETF_MAP = {
+  '00981A': '統一台股增長',
+  '00982A': '群益台灣強棒'
+};
+
+const ADMIN_PWD = '0010506';
+let curETF = '00981A';
+let curMode = 'view';
+let cachedData = [];
+let parsedCSV = null;
+
+// 連線狀態
+document.getElementById('statusDot').classList.add('connected');
+document.getElementById('statusText').textContent = '已連線至雲端';
+
+// 設今天日期
+const d = new Date();
+document.getElementById('dateInput').value =
+  `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+
+// 模式切換
+window.setMode = function(mode) {
+  if(mode === 'admin'){
+    const pwd = prompt('請輸入管理密碼：');
+    if(pwd !== ADMIN_PWD){ alert('密碼錯誤！'); return; }
+  }
+  curMode = mode;
+  document.getElementById('btnView').classList.toggle('active', mode === 'view');
+  document.getElementById('btnAdmin').classList.toggle('active', mode === 'admin');
+  document.getElementById('adminPanel').classList.toggle('visible', mode === 'admin');
+};
+
+// ETF 切換（管理）
+window.switchETF = function(code, name, btn) {
+  curETF = code;
+  document.querySelectorAll('#etfTabs .etf-tab').forEach(t=>t.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('inputTitle').textContent = `上傳 ${code} 持股 CSV`;
+  clearUpload();
+  loadData();
+};
+
+// ETF 切換（查詢）
+window.switchViewETF = function(code, name, btn) {
+  curETF = code;
+  document.querySelectorAll('#viewETFTabs .etf-tab').forEach(t=>t.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('etfLabel').textContent = `${code} ${ETF_MAP[code]}`;
+  document.getElementById('resultArea').innerHTML = '';
+  loadData();
+};
+
+// CSV 解析
+function parseCSV(text) {
+  const lines = text.split('\n').map(l => l.trim()).filter(l => l);
+  if(!lines.length) return {};
+
+  const h = {};
+  // 跳過標題行
+  const startIdx = lines[0].includes('名稱') || lines[0].includes('股票') ? 1 : 0;
+
+  for(let i = startIdx; i < lines.length; i++) {
+    const cols = lines[i].split(',').map(c => c.trim().replace(/"/g,''));
+    if(cols.length < 2) continue;
+
+    // 欄位：名稱, 權重, 股數
+    const nameRaw = cols[0];
+    const weightStr = cols[1];
+    const sharesStr = cols[2];
+
+    if(!nameRaw || !sharesStr) continue;
+
+    // 從名稱抓代號：「台積電(2330.TW)」-> 2330
+    const codeMatch = nameRaw.match(/\((\d{4})\.TW\)/i) || nameRaw.match(/\((\d{4})\)/);
+    let code = codeMatch ? codeMatch[1] : '';
+
+    // 清理名稱：移除代號部分
+    let name = nameRaw.replace(/\([^)]*\)/g, '').replace(/\s+/g,'').trim();
+    if(!name) name = nameRaw.trim();
+
+    const shares = parseInt(String(sharesStr).replace(/,/g,''));
+    const weight = parseFloat(String(weightStr).replace(/,/g,''));
+
+    if(shares > 0 && name) {
+      const key = code || name;
+      if(!h[key]) {
+        h[key] = { code: code || name, name, shares, weight: isNaN(weight) ? 0 : weight };
+      }
+    }
+  }
+  return h;
+}
+
+// 檔案選擇
+window.handleFileSelect = function(event) {
+  const file = event.target.files[0];
+  if(!file) return;
+  readCSVFile(file);
+};
+
+window.handleDrop = function(event) {
+  event.preventDefault();
+  document.getElementById('uploadArea').classList.remove('dragover');
+  const file = event.dataTransfer.files[0];
+  if(file && file.name.endsWith('.csv')) readCSVFile(file);
+};
+
+function readCSVFile(file) {
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    const text = e.target.result;
+    parsedCSV = parseCSV(text);
+    const count = Object.keys(parsedCSV).length;
+    document.getElementById('uploadFilename').textContent =
+      count > 0 ? `✓ ${file.name}（解析到 ${count} 檔）` : '⚠ 解析失敗，請確認格式';
+    document.getElementById('saveMsg').innerHTML = '';
+  };
+  reader.readAsText(file, 'UTF-8');
+}
+
+window.clearUpload = function() {
+  parsedCSV = null;
+  document.getElementById('csvFile').value = '';
+  document.getElementById('uploadFilename').textContent = '';
+  document.getElementById('saveMsg').innerHTML = '';
+};
+
+// 載入資料
+async function loadData() {
+  document.getElementById('savedList').innerHTML = '<div class="loading">載入中...</div>';
+  try {
+    const q = query(collection(db, `holdings_${curETF}`), orderBy('date', 'desc'));
+    const snap = await getDocs(q);
+    cachedData = snap.docs.map(d => d.data());
+    renderSaved();
+    updateSelects();
+  } catch(e) {
+    document.getElementById('savedList').innerHTML = '<div class="empty">載入失敗，請確認網路連線</div>';
+  }
+}
+
+// 儲存
+window.saveData = async function() {
+  const date = document.getElementById('dateInput').value;
+  const msgEl = document.getElementById('saveMsg');
+  const btn = document.getElementById('saveBtn');
+
+  if(!parsedCSV){ msgEl.innerHTML='<div class="msg err">請先上傳 CSV 檔案</div>'; return; }
+  if(!date){ msgEl.innerHTML='<div class="msg err">請選擇日期</div>'; return; }
+
+  const count = Object.keys(parsedCSV).length;
+  if(count < 3){ msgEl.innerHTML=`<div class="msg err">只解析到 ${count} 檔，請確認檔案格式</div>`; return; }
+
+  btn.disabled = true;
+  btn.textContent = '上傳中...';
+  try {
+    await setDoc(doc(db, `holdings_${curETF}`, date), { date, holdings: parsedCSV, count });
+    msgEl.innerHTML=`<div class="msg ok">上傳成功！${count} 檔持股已儲存至雲端（${date}）</div>`;
+    clearUpload();
+    await loadData();
+  } catch(e) {
+    msgEl.innerHTML='<div class="msg err">上傳失敗，請確認網路連線</div>';
+  }
+  btn.disabled = false;
+  btn.textContent = '上傳資料到雲端';
+};
+
+// 刪除
+window.delEntry = async function(date) {
+  if(!confirm(`確定刪除 ${date} 的資料？`)) return;
+  await deleteDoc(doc(db, `holdings_${curETF}`, date));
+  await loadData();
+};
+
+function renderSaved() {
+  const el = document.getElementById('savedList');
+  if(!cachedData.length){ el.innerHTML='<div class="empty">尚未儲存任何資料</div>'; return; }
+  const isAdmin = curMode === 'admin';
+  el.innerHTML = cachedData.map(d=>`
+    <div class="saved-item">
+      <div><span class="saved-date">${d.date}</span><span class="saved-info">${d.count} 檔持股</span></div>
+      ${isAdmin ? `<button class="sm" onclick="delEntry('${d.date}')">刪除</button>` : ''}
+    </div>`).join('');
+}
+
+function updateSelects() {
+  const opts = cachedData.map(d=>`<option value="${d.date}">${d.date}（${d.count}檔）</option>`).join('');
+  document.getElementById('selA').innerHTML='<option value="">舊資料（基期）</option>'+opts;
+  document.getElementById('selB').innerHTML='<option value="">新資料（比較）</option>'+opts;
+}
+
+// 比對
+window.compare = function() {
+  const dA=document.getElementById('selA').value;
+  const dB=document.getElementById('selB').value;
+  const el=document.getElementById('resultArea');
+  if(!dA||!dB){ el.innerHTML='<div class="msg err" style="margin-bottom:1rem">請選擇兩筆資料</div>'; return; }
+  if(dA===dB){ el.innerHTML='<div class="msg err" style="margin-bottom:1rem">請選擇不同日期</div>'; return; }
+
+  const A=cachedData.find(d=>d.date===dA);
+  const B=cachedData.find(d=>d.date===dB);
+  if(!A||!B){ el.innerHTML='<div class="msg err">找不到資料</div>'; return; }
+
+  const old=A.holdings, now=B.holdings;
+  const allKeys=[...new Set([...Object.keys(old),...Object.keys(now)])];
+  const newIn=[],added=[],reduced=[],cleared=[];
+
+  for(const key of allKeys){
+    const o=old[key], n=now[key];
+    if(!o&&n) newIn.push({...n});
+    else if(o&&!n) cleared.push({...o});
+    else if(o&&n){
+      const diff=n.shares-o.shares;
+      if(diff>0) added.push({...n,oldShares:o.shares,diff});
+      else if(diff<0) reduced.push({...n,oldShares:o.shares,diff});
+    }
+  }
+
+  added.sort((a,b)=>b.diff-a.diff);
+  reduced.sort((a,b)=>a.diff-b.diff);
+  newIn.sort((a,b)=>b.shares-a.shares);
+  cleared.sort((a,b)=>b.shares-a.shares);
+
+  const etfName=ETF_MAP[curETF]||curETF;
+  const fmt=n=>Number(n).toLocaleString();
+  const pct=(a,b)=>{ if(!a) return 'N/A'; const p=((b-a)/a*100); return (p>0?'+':'')+p.toFixed(1)+'%'; };
+
+  let html=`<div class="card">
+  <div class="result-header">${curETF} ${etfName}｜${dA} → ${dB}</div>
+  <div class="summary-grid">
+    <div class="scard"><div class="scard-label">新進</div><div class="scard-val c-blue">${newIn.length}</div></div>
+    <div class="scard"><div class="scard-label">加碼</div><div class="scard-val c-green">${added.length}</div></div>
+    <div class="scard"><div class="scard-label">減碼</div><div class="scard-val c-red">${reduced.length}</div></div>
+    <div class="scard"><div class="scard-label">出清</div><div class="scard-val c-amber">${cleared.length}</div></div>
+  </div>`;
+
+  if(newIn.length){
+    html+=`<div class="group-label label-new">新進 ${newIn.length} 檔</div>
+    <table><tr><th width="70">代號</th><th>名稱</th><th width="120">股數</th><th width="80">權重</th></tr>`;
+    newIn.forEach(s=>{ html+=`<tr><td>${s.code}</td><td>${s.name}</td><td class="c-blue">${fmt(s.shares)}</td><td>${s.weight}%</td></tr>`; });
+    html+='</table>';
+  }
+  if(added.length){
+    html+=`<div class="group-label label-buy">加碼 ${added.length} 檔</div>
+    <table><tr><th width="70">代號</th><th>名稱</th><th width="110">舊股數</th><th width="110">新股數</th><th width="90">增加</th><th width="70">增幅</th></tr>`;
+    added.forEach(s=>{ html+=`<tr><td>${s.code}</td><td>${s.name}</td><td class="c-muted">${fmt(s.oldShares)}</td><td>${fmt(s.shares)}</td><td class="c-green">+${fmt(s.diff)}</td><td class="c-green">${pct(s.oldShares,s.shares)}</td></tr>`; });
+    html+='</table>';
+  }
+  if(reduced.length){
+    html+=`<div class="group-label label-sell">減碼 ${reduced.length} 檔</div>
+    <table><tr><th width="70">代號</th><th>名稱</th><th width="110">舊股數</th><th width="110">新股數</th><th width="90">減少</th><th width="70">減幅</th></tr>`;
+    reduced.forEach(s=>{ html+=`<tr><td>${s.code}</td><td>${s.name}</td><td class="c-muted">${fmt(s.oldShares)}</td><td>${fmt(s.shares)}</td><td class="c-red">${fmt(s.diff)}</td><td class="c-red">${pct(s.oldShares,s.shares)}</td></tr>`; });
+    html+='</table>';
+  }
+  if(cleared.length){
+    html+=`<div class="group-label label-clear">出清 ${cleared.length} 檔</div>
+    <table><tr><th width="70">代號</th><th>名稱</th><th width="120">舊股數</th><th width="80">舊權重</th></tr>`;
+    cleared.forEach(s=>{ html+=`<tr><td>${s.code}</td><td>${s.name}</td><td class="c-amber">${fmt(s.shares)}</td><td>${s.weight}%</td></tr>`; });
+    html+='</table>';
+  }
+  if(!newIn.length&&!added.length&&!reduced.length&&!cleared.length){
+    html+='<div class="empty">兩筆資料完全相同，沒有任何異動</div>';
+  }
+  html+='</div>';
+  el.innerHTML=html;
+};
+
+loadData();
+</script>
+</body>
+</html>
