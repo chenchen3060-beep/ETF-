@@ -246,17 +246,78 @@ window.switchViewETF = function(code, name, btn) {
   loadData();
 };
 
-// 解析引擎
-function cleanName(n){ return n.replace(/\s+/g,'').replace(/（.*?）/g,'').replace(/\(.*?\)/g,'').trim(); }
+// 股票代號對照簡稱
+const STOCK_NAMES = {
+  '2330':'台積電','2308':'台達電','2383':'台光電','2382':'廣達','2317':'鴻海',
+  '2345':'智邦','2360':'致茂','2368':'金像電','2344':'華邦電','2454':'聯發科',
+  '2408':'南亞科','2449':'京元電','2404':'漢唐','2313':'華通','2347':'聯強',
+  '2303':'聯電','2327':'國巨','2357':'華碩','2379':'瑞昱','2376':'技嘉',
+  '2059':'川湖','2337':'旺宏','3017':'奇鋐','3037':'欣興','3653':'健策',
+  '3665':'貿聯-KY','3036':'文曄','3105':'穩懋','3189':'景碩','3211':'順達',
+  '3264':'欣銓','3443':'創意','3491':'昇達科','3533':'嘉澤','3583':'辛耘',
+  '3661':'世芯-KY','3711':'日月光投','3231':'緯創','5274':'信驊','5347':'世界',
+  '5536':'聖暉','6139':'亞翔','6147':'頎邦','6223':'旺矽','6257':'矽格',
+  '6274':'台燿','6285':'啟碁','6442':'光紅建聖','6488':'環球晶','6510':'精測',
+  '6515':'穎崴','6669':'緯穎','6805':'富世達','6831':'邁科','8046':'南電',
+  '8210':'勤誠','8299':'群聯','8996':'高力','7769':'鴻勁','4958':'臻鼎-KY',
+  '1303':'南亞','1326':'台化','1590':'亞德客-KY','2881':'富邦金','2882':'國泰金',
+  '2883':'凱基金','2884':'玉山金','2885':'元大金','2886':'兆豐金','2887':'台新金',
+  '2890':'永豐金','2891':'中信金','2892':'第一金','2897':'王道銀','2603':'長榮海',
+  '2618':'長榮航','2412':'中華電','3045':'台灣大','4904':'遠傳','1102':'亞泥',
+  '1402':'遠東新','2002':'中鋼','2006':'東和鋼','9904':'寶成','9910':'豐泰',
+  '3008':'大立光','2474':'可成','2481':'強茂','4915':'致伸','1519':'華城',
+  '4938':'和碩','6177':'達麗','2467':'志聖','3131':'弘塑','6691':'洋基工程',
+  '8464':'億豐','2027':'大成鋼','3374':'精材','6121':'新普','6715':'嘉基',
+  '1717':'長興','3081':'聯亞','5289':'宜鼎','2472':'立隆電','3529':'力旺',
+  '5434':'崇越','3023':'信邦','1477':'聚陽','6505':'台塑石化','2645':'長榮航太',
+  '3293':'鈊象','5904':'寶雅','2548':'華固','4749':'新應材','6584':'南俊'
+};
+
+function cleanName(n){
+  return n.replace(/\s+/g,'').replace(/（.*?）/g,'').replace(/\(.*?\)/g,'').trim();
+}
+
+function getShortName(code, rawName){
+  if(STOCK_NAMES[code]) return STOCK_NAMES[code];
+  const clean = cleanName(rawName);
+  if(clean.length > 6) return clean.substring(0, 6);
+  return clean;
+}
+
+// 復華專用：代號+名稱+股數+金額+權重%
+function parseFuhua(text){
+  const h = {};
+  const re = /(\d{4})([^\d%]{2,12}?)([\d,]+),([\d,]{6,}),([\d.]+)%/g;
+  let m;
+  while((m = re.exec(text)) !== null){
+    const code = m[1].trim();
+    const rawName = m[2].trim();
+    const shares = parseInt(m[3].replace(/,/g,''));
+    const weight = parseFloat(m[5]);
+    if(code && shares > 0 && shares < 50000000 && !h[code]){
+      h[code] = {code, name: getShortName(code, rawName), shares, weight};
+    }
+  }
+  return h;
+}
 
 function parseHorizontal(text){
   const h = {};
+  // 先試復華格式
+  const fuhua = parseFuhua(text);
+  if(Object.keys(fuhua).length > 5) return fuhua;
+
   text = text.replace(/\b\d{1,3}(?=\d{4}[^\d])/g, '');
   const re = /(\d{4})\s*([^\d%]+?)\s*([\d,]+)\s*(?:[\d,]+\s*)?([\d.]+)%/g;
   let m;
   while((m = re.exec(text)) !== null){
-    const code=m[1].trim(), name=cleanName(m[2]), shares=parseInt(m[3].replace(/,/g,'')), weight=parseFloat(m[4]);
-    if(code&&name&&name.length>=2&&shares>0&&!h[code]) h[code]={code,name,shares,weight};
+    const code=m[1].trim();
+    const rawName=m[2];
+    const shares=parseInt(m[3].replace(/,/g,''));
+    const weight=parseFloat(m[4]);
+    if(code && rawName && shares>0 && shares<50000000 && !h[code]){
+      h[code]={code, name: getShortName(code, rawName), shares, weight};
+    }
   }
   return h;
 }
