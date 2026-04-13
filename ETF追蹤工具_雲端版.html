@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>主動型ETF持股追蹤工具</title>
+<title>主動型 ETF 持股追蹤看板</title>
 <style>
   :root {
     --bg: #f7f6f3;
@@ -27,13 +27,17 @@
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: 'PingFang TC', 'Microsoft JhengHei', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
   .container { max-width: 900px; margin: 0 auto; padding: 2rem 1rem; }
-  .top-row { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 2rem; }
+  .top-row { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 1.5rem; }
   .top-left h1 { font-size: 22px; font-weight: 600; margin-bottom: 4px; }
   .top-left p { font-size: 13px; color: var(--text-muted); }
   .top-right { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
   .status-dot { width: 8px; height: 8px; border-radius: 50%; background: #ccc; display: inline-block; margin-right: 4px; }
   .status-dot.connected { background: var(--green); }
   .status-text { font-size: 12px; color: var(--text-muted); }
+
+  .disclaimer { background: #fffbf0; border: 1px solid #e8d88a; border-radius: var(--radius-sm); padding: 10px 14px; margin-bottom: 1.25rem; }
+  .disclaimer-title { font-size: 13px; font-weight: 600; color: #7a6200; margin-bottom: 4px; }
+  .disclaimer-body { font-size: 12px; color: #7a6200; line-height: 1.6; }
 
   .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.25rem; margin-bottom: 1rem; }
   .card-title { font-size: 13px; font-weight: 600; color: var(--text-muted); margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.05em; }
@@ -47,8 +51,13 @@
   .etf-tab:hover { border-color: var(--blue); color: var(--blue); }
   .etf-tab.active { background: var(--blue); border-color: var(--blue); color: white; }
 
-  textarea { width: 100%; min-height: 120px; padding: 10px 12px; font-size: 12px; font-family: 'Courier New', monospace; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--bg); color: var(--text); resize: vertical; outline: none; transition: border-color 0.15s; }
-  textarea:focus { border-color: var(--blue); }
+  .upload-area { border: 2px dashed var(--border-strong); border-radius: var(--radius-sm); padding: 2rem; text-align: center; cursor: pointer; transition: all 0.15s; background: var(--bg); }
+  .upload-area:hover { border-color: var(--blue); background: var(--blue-light); }
+  .upload-area.dragover { border-color: var(--blue); background: var(--blue-light); }
+  .upload-label { font-size: 14px; color: var(--text-muted); margin-bottom: 6px; }
+  .upload-hint { font-size: 12px; color: var(--text-faint); }
+  .upload-filename { font-size: 13px; color: var(--green); font-weight: 500; margin-top: 8px; }
+  input[type=file] { display: none; }
 
   .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 10px; }
   input[type=date] { padding: 8px 12px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--surface); color: var(--text); font-size: 13px; outline: none; }
@@ -63,7 +72,6 @@
   .msg { padding: 8px 12px; border-radius: var(--radius-sm); font-size: 13px; margin-top: 8px; }
   .msg.ok { background: var(--green-light); color: var(--green); }
   .msg.err { background: var(--red-light); color: var(--red); }
-  .msg.info { background: var(--blue-light); color: var(--blue); }
 
   .saved-item { display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; background: var(--bg); border-radius: var(--radius-sm); margin-bottom: 6px; font-size: 13px; }
   .saved-date { font-weight: 600; }
@@ -96,10 +104,9 @@
   .c-amber { color: var(--amber); font-weight: 600; }
   .c-muted { color: var(--text-muted); }
   .empty { color: var(--text-faint); font-size: 13px; text-align: center; padding: 2rem; }
-  .hint { font-size: 12px; color: var(--text-faint); margin-top: 6px; }
+  .loading { text-align: center; padding: 2rem; color: var(--text-muted); font-size: 13px; }
   .admin-only { display: none; }
   .admin-only.visible { display: block; }
-  .loading { text-align: center; padding: 2rem; color: var(--text-muted); font-size: 13px; }
 </style>
 </head>
 <body>
@@ -107,8 +114,8 @@
 
   <div class="top-row">
     <div class="top-left">
-      <h1>主動型ETF持股追蹤工具</h1>
-      <p>支援統一、群益、野村、復華、安聯、國泰等各家投信格式</p>
+      <h1>主動型 ETF 持股追蹤看板 <span style="font-size:16px;color:var(--blue)">(Premium)</span></h1>
+      <p>由馬克設計開發 ｜ 跨平台數據整合分析</p>
     </div>
     <div class="top-right">
       <span class="status-dot" id="statusDot"></span>
@@ -116,29 +123,41 @@
     </div>
   </div>
 
+  <!-- 免責聲明 -->
+  <div class="disclaimer">
+    <div class="disclaimer-title">【免責聲明】</div>
+    <div class="disclaimer-body">本工具數據已力求精準，惟實際資訊仍以各投信官網公告為準。<br>本資料僅供參考，不構成任何投資邀約或建議，投資人應獨立判斷並自負盈虧。</div>
+  </div>
+
   <!-- 模式切換 -->
   <div class="mode-toggle">
     <button class="mode-btn active" id="btnView" onclick="setMode('view')">查詢模式（客戶）</button>
-    <button class="mode-btn" id="btnAdmin" onclick="setMode('admin')">管理模式（輸入資料）</button>
+    <button class="mode-btn" id="btnAdmin" onclick="setMode('admin')">管理模式（後台）</button>
   </div>
 
-  <!-- 管理模式：輸入資料 -->
+  <!-- 管理模式 -->
   <div class="admin-only" id="adminPanel">
     <div class="card">
-      <div class="card-title" id="inputTitle">貼入今日完整持股</div>
+      <div class="card-title" id="inputTitle">上傳 00981A 持股 CSV</div>
       <div class="etf-tabs" id="etfTabs">
         <button class="etf-tab active" onclick="switchETF('00981A','統一台股增長',this)">00981A 統一</button>
         <button class="etf-tab" onclick="switchETF('00982A','群益台灣強棒',this)">00982A 群益</button>
-        <button class="etf-tab" onclick="switchETF('00980A','野村臺灣優選',this)">00980A 野村</button>
-        <button class="etf-tab" onclick="switchETF('00991A','復華未來50',this)">00991A 復華</button>
-        <button class="etf-tab" onclick="switchETF('00984A','安聯台灣高息',this)">00984A 安聯</button>
-        <button class="etf-tab" onclick="switchETF('00400A','國泰動能高息',this)">00400A 國泰</button>
       </div>
-      <textarea id="inputArea" placeholder="直接從投信官網複製持股資料貼上，不需要整理格式！"></textarea>
+
+      <div class="upload-area" id="uploadArea" onclick="document.getElementById('csvFile').click()"
+        ondragover="event.preventDefault();this.classList.add('dragover')"
+        ondragleave="this.classList.remove('dragover')"
+        ondrop="handleDrop(event)">
+        <div class="upload-label">點擊上傳 CSV 檔案，或拖拉至此</div>
+        <div class="upload-hint">格式：名稱、權重、股數（Gemini 產出的格式）</div>
+        <div class="upload-filename" id="uploadFilename"></div>
+      </div>
+      <input type="file" id="csvFile" accept=".csv" onchange="handleFileSelect(event)">
+
       <div class="row">
         <input type="date" id="dateInput">
         <button class="primary" onclick="saveData()" id="saveBtn">上傳資料到雲端</button>
-        <button onclick="document.getElementById('inputArea').value=''">清除</button>
+        <button onclick="clearUpload()">清除</button>
       </div>
       <div id="saveMsg"></div>
     </div>
@@ -148,13 +167,9 @@
   <div id="viewETFTabs" class="etf-tabs">
     <button class="etf-tab active" onclick="switchViewETF('00981A','統一台股增長',this)">00981A 統一</button>
     <button class="etf-tab" onclick="switchViewETF('00982A','群益台灣強棒',this)">00982A 群益</button>
-    <button class="etf-tab" onclick="switchViewETF('00980A','野村臺灣優選',this)">00980A 野村</button>
-    <button class="etf-tab" onclick="switchViewETF('00991A','復華未來50',this)">00991A 復華</button>
-    <button class="etf-tab" onclick="switchViewETF('00984A','安聯台灣高息',this)">00984A 安聯</button>
-    <button class="etf-tab" onclick="switchViewETF('00400A','國泰動能高息',this)">00400A 國泰</button>
   </div>
 
-  <!-- 已儲存資料列表 -->
+  <!-- 已儲存資料 -->
   <div class="card">
     <div class="card-title">已有資料 — <span id="etfLabel">00981A 統一台股增長</span></div>
     <div id="savedList"><div class="loading">載入中...</div></div>
@@ -174,7 +189,6 @@
   <div id="resultArea"></div>
 </div>
 
-<!-- Firebase SDK -->
 <script type="module">
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
 import { getFirestore, collection, doc, setDoc, getDocs, deleteDoc, query, orderBy } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
@@ -193,31 +207,29 @@ const db = getFirestore(app);
 
 const ETF_MAP = {
   '00981A': '統一台股增長',
-  '00982A': '群益台灣強棒',
-  '00980A': '野村臺灣優選',
-  '00991A': '復華未來50',
-  '00984A': '安聯台灣高息',
-  '00400A': '國泰動能高息'
+  '00982A': '群益台灣強棒'
 };
 
+const ADMIN_PWD = '0010506';
 let curETF = '00981A';
 let curMode = 'view';
 let cachedData = [];
+let parsedCSV = null;
 
 // 連線狀態
 document.getElementById('statusDot').classList.add('connected');
 document.getElementById('statusText').textContent = '已連線至雲端';
 
-// 模式切換
-const ADMIN_PWD = '0010506';
+// 設今天日期
+const d = new Date();
+document.getElementById('dateInput').value =
+  `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 
+// 模式切換
 window.setMode = function(mode) {
   if(mode === 'admin'){
     const pwd = prompt('請輸入管理密碼：');
-    if(pwd !== ADMIN_PWD){
-      alert('密碼錯誤！');
-      return;
-    }
+    if(pwd !== ADMIN_PWD){ alert('密碼錯誤！'); return; }
   }
   curMode = mode;
   document.getElementById('btnView').classList.toggle('active', mode === 'view');
@@ -230,9 +242,8 @@ window.switchETF = function(code, name, btn) {
   curETF = code;
   document.querySelectorAll('#etfTabs .etf-tab').forEach(t=>t.classList.remove('active'));
   btn.classList.add('active');
-  document.getElementById('inputTitle').textContent = `貼入 ${code} ${name} 今日完整持股`;
-  document.getElementById('inputArea').value = '';
-  document.getElementById('saveMsg').innerHTML = '';
+  document.getElementById('inputTitle').textContent = `上傳 ${code} 持股 CSV`;
+  clearUpload();
   loadData();
 };
 
@@ -241,166 +252,88 @@ window.switchViewETF = function(code, name, btn) {
   curETF = code;
   document.querySelectorAll('#viewETFTabs .etf-tab').forEach(t=>t.classList.remove('active'));
   btn.classList.add('active');
-  document.getElementById('etfLabel').textContent = `${code} ${name}`;
+  document.getElementById('etfLabel').textContent = `${code} ${ETF_MAP[code]}`;
   document.getElementById('resultArea').innerHTML = '';
   loadData();
 };
 
-// 股票代號對照簡稱
-const STOCK_NAMES = {
-  '2330':'台積電','2308':'台達電','2383':'台光電','2382':'廣達','2317':'鴻海',
-  '2345':'智邦','2360':'致茂','2368':'金像電','2344':'華邦電','2454':'聯發科',
-  '2408':'南亞科','2449':'京元電','2404':'漢唐','2313':'華通','2347':'聯強',
-  '2303':'聯電','2327':'國巨','2357':'華碩','2379':'瑞昱','2376':'技嘉',
-  '2059':'川湖','2337':'旺宏','3017':'奇鋐','3037':'欣興','3653':'健策',
-  '3665':'貿聯-KY','3036':'文曄','3105':'穩懋','3189':'景碩','3211':'順達',
-  '3264':'欣銓','3443':'創意','3491':'昇達科','3533':'嘉澤','3583':'辛耘',
-  '3661':'世芯-KY','3711':'日月光投','3231':'緯創','5274':'信驊','5347':'世界',
-  '5536':'聖暉','6139':'亞翔','6147':'頎邦','6223':'旺矽','6257':'矽格',
-  '6274':'台燿','6285':'啟碁','6442':'光紅建聖','6488':'環球晶','6510':'精測',
-  '6515':'穎崴','6669':'緯穎','6805':'富世達','6831':'邁科','8046':'南電',
-  '8210':'勤誠','8299':'群聯','8996':'高力','7769':'鴻勁','4958':'臻鼎-KY',
-  '1303':'南亞','1326':'台化','1590':'亞德客-KY','2881':'富邦金','2882':'國泰金',
-  '2883':'凱基金','2884':'玉山金','2885':'元大金','2886':'兆豐金','2887':'台新金',
-  '2890':'永豐金','2891':'中信金','2892':'第一金','2897':'王道銀','2603':'長榮海',
-  '2618':'長榮航','2412':'中華電','3045':'台灣大','4904':'遠傳','1102':'亞泥',
-  '1402':'遠東新','2002':'中鋼','2006':'東和鋼','9904':'寶成','9910':'豐泰',
-  '3008':'大立光','2474':'可成','2481':'強茂','4915':'致伸','1519':'華城',
-  '4938':'和碩','6177':'達麗','2467':'志聖','3131':'弘塑','6691':'洋基工程',
-  '8464':'億豐','2027':'大成鋼','3374':'精材','6121':'新普','6715':'嘉基',
-  '1717':'長興','3081':'聯亞','5289':'宜鼎','2472':'立隆電','3529':'力旺',
-  '5434':'崇越','3023':'信邦','1477':'聚陽','6505':'台塑石化','2645':'長榮航太',
-  '3293':'鈊象','5904':'寶雅','2548':'華固','4749':'新應材','6584':'南俊'
+// CSV 解析
+function parseCSV(text) {
+  const lines = text.split('\n').map(l => l.trim()).filter(l => l);
+  if(!lines.length) return {};
+
+  const h = {};
+  // 跳過標題行
+  const startIdx = lines[0].includes('名稱') || lines[0].includes('股票') ? 1 : 0;
+
+  for(let i = startIdx; i < lines.length; i++) {
+    const cols = lines[i].split(',').map(c => c.trim().replace(/"/g,''));
+    if(cols.length < 2) continue;
+
+    // 欄位：名稱, 權重, 股數
+    const nameRaw = cols[0];
+    const weightStr = cols[1];
+    const sharesStr = cols[2];
+
+    if(!nameRaw || !sharesStr) continue;
+
+    // 從名稱抓代號：「台積電(2330.TW)」-> 2330
+    const codeMatch = nameRaw.match(/\((\d{4})\.TW\)/i) || nameRaw.match(/\((\d{4})\)/);
+    let code = codeMatch ? codeMatch[1] : '';
+
+    // 清理名稱：移除代號部分
+    let name = nameRaw.replace(/\([^)]*\)/g, '').replace(/\s+/g,'').trim();
+    if(!name) name = nameRaw.trim();
+
+    const shares = parseInt(String(sharesStr).replace(/,/g,''));
+    const weight = parseFloat(String(weightStr).replace(/,/g,''));
+
+    if(shares > 0 && name) {
+      const key = code || name;
+      if(!h[key]) {
+        h[key] = { code: code || name, name, shares, weight: isNaN(weight) ? 0 : weight };
+      }
+    }
+  }
+  return h;
+}
+
+// 檔案選擇
+window.handleFileSelect = function(event) {
+  const file = event.target.files[0];
+  if(!file) return;
+  readCSVFile(file);
 };
 
-function cleanName(n){
-  return n.replace(/\s+/g,'').replace(/（.*?）/g,'').replace(/\(.*?\)/g,'').trim();
+window.handleDrop = function(event) {
+  event.preventDefault();
+  document.getElementById('uploadArea').classList.remove('dragover');
+  const file = event.dataTransfer.files[0];
+  if(file && file.name.endsWith('.csv')) readCSVFile(file);
+};
+
+function readCSVFile(file) {
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    const text = e.target.result;
+    parsedCSV = parseCSV(text);
+    const count = Object.keys(parsedCSV).length;
+    document.getElementById('uploadFilename').textContent =
+      count > 0 ? `✓ ${file.name}（解析到 ${count} 檔）` : '⚠ 解析失敗，請確認格式';
+    document.getElementById('saveMsg').innerHTML = '';
+  };
+  reader.readAsText(file, 'UTF-8');
 }
 
-function getShortName(code, rawName){
-  if(STOCK_NAMES[code]) return STOCK_NAMES[code];
-  const clean = cleanName(rawName);
-  if(clean.length > 6) return clean.substring(0, 6);
-  return clean;
-}
-
-// 復華專用：代號+名稱+股數+金額+權重%
-function parseFuhua(text){
-  const h = {};
-  const re = /(\d{4})([^\d%]{2,12}?)([\d,]+)([\d.]+)%/g;
-  let m;
-  while((m = re.exec(text)) !== null){
-    const code = m[1].trim();
-    const rawName = m[2].trim();
-    const numbers_part = m[3];
-    const weight_str = m[4];
-    const dot_pos = weight_str.indexOf('.');
-    let weight;
-    if(dot_pos >= 0){
-      const int_part = weight_str.substring(0, dot_pos).replace(/^0+/, '') || '0';
-      weight = parseFloat(int_part + weight_str.substring(dot_pos));
-    } else {
-      weight = parseFloat(weight_str.replace(/^0+/, '') || '0');
-    }
-    const num_groups = numbers_part.match(/\d{1,3}(?:,\d{3})+/g);
-    let shares = 0;
-    if(num_groups){
-      shares = parseInt(num_groups[0].replace(/,/g,''));
-    } else {
-      const plain = numbers_part.match(/\d+/);
-      shares = plain ? parseInt(plain[0]) : 0;
-    }
-    if(code && shares > 0 && !h[code]){
-      h[code] = {code, name: getShortName(code, rawName), shares, weight};
-    }
-  }
-  return h;
-}
-
-function parseHorizontal(text){
-  const h = {};
-  // 先試復華格式
-  const fuhua = parseFuhua(text);
-  if(Object.keys(fuhua).length > 5) return fuhua;
-
-  text = text.replace(/\b\d{1,3}(?=\d{4}[^\d])/g, '');
-  const re = /(\d{4})\s*([^\d%]+?)\s*([\d,]+)\s*(?:[\d,]+\s*)?([\d.]+)%/g;
-  let m;
-  while((m = re.exec(text)) !== null){
-    const code=m[1].trim();
-    const rawName=m[2];
-    const shares=parseInt(m[3].replace(/,/g,''));
-    const weight=parseFloat(m[4]);
-    if(code && rawName && shares>0 && shares<50000000 && !h[code]){
-      h[code]={code, name: getShortName(code, rawName), shares, weight};
-    }
-  }
-  return h;
-}
-
-// 野村專用：代號+全名+股數+權重(無%符號)
-function parseNomura(text){
-  const h = {};
-  const re = /(\d{4})([^\d（(]{3,20}?)([\d,]+)(\d+\.\d+)(?=\d{4}|$)/g;
-  let m;
-  while((m = re.exec(text)) !== null){
-    const code = m[1];
-    const rawName = m[2].replace(/[（(].*?[）)]/g,'').trim();
-    const shares = parseInt(m[3].replace(/,/g,''));
-    let weight = parseFloat(m[4]);
-    while(weight > 100) weight = weight / 10;
-    weight = Math.round(weight * 100) / 100;
-    if(code && shares > 0 && !h[code]){
-      h[code] = {code, name: getShortName(code, rawName), shares, weight};
-    }
-  }
-  return h;
-}
-
-function parseVertical(text){
-  const h = {};
-  const lines = text.split('\n').map(l=>l.trim()).filter(l=>l);
-  const skip = ['股票代號','股票名稱','持股權重(%)','股數','序號','權重(%)'];
-  const filtered = lines.filter(l=>!skip.includes(l)&&!l.includes('持股權重'));
-  let i = 0;
-  while(i < filtered.length - 3){
-    if(/^\d{4}$/.test(filtered[i])){
-      const code=filtered[i], name=getShortName(filtered[i], filtered[i+1]);
-      const wm=filtered[i+2].match(/([\d.]+)%/), sm=filtered[i+3].replace(/,/g,'');
-      if(wm&&/^\d+$/.test(sm)&&name.length>=2){ h[code]={code,name,shares:parseInt(sm),weight:parseFloat(wm[1])}; i+=4; continue; }
-    }
-    i++;
-  }
-  return h;
-}
-
-function parseKatex(text){
-  const h = {};
-  const lines = text.split('\n').map(l=>l.trim()).filter(l=>l);
-  for(let i=0;i<lines.length-1;i++){
-    const m1=lines[i].match(/^(\d{4})\s*([^\d%,]+)/);
-    if(!m1) continue;
-    const code=m1[1], name=getShortName(m1[1], m1[2]);
-    const m2=lines[i+1].match(/([\d,]+)\s*([\d.]+)%/);
-    if(m2&&name.length>=2){ h[code]={code,name,shares:parseInt(m2[1].replace(/,/g,'')),weight:parseFloat(m2[2])}; i++; }
-  }
-  return h;
-}
-
-function parseHoldings(text){
-  const lineCount=(text.match(/\n/g)||[]).length;
-  if(lineCount>20){
-    const v=parseVertical(text); if(Object.keys(v).length>5) return v;
-    const k=parseKatex(text); if(Object.keys(k).length>5) return k;
-  }
-  // 先試野村格式（無%符號的橫式）
-  const nomura = parseNomura(text);
-  if(Object.keys(nomura).length>5) return nomura;
-  return parseHorizontal(text);
-}
+window.clearUpload = function() {
+  parsedCSV = null;
+  document.getElementById('csvFile').value = '';
+  document.getElementById('uploadFilename').textContent = '';
+  document.getElementById('saveMsg').innerHTML = '';
+};
 
 // 載入資料
-async function loadData(){
+async function loadData() {
   document.getElementById('savedList').innerHTML = '<div class="loading">載入中...</div>';
   try {
     const q = query(collection(db, `holdings_${curETF}`), orderBy('date', 'desc'));
@@ -413,22 +346,24 @@ async function loadData(){
   }
 }
 
-// 儲存資料
+// 儲存
 window.saveData = async function() {
-  const text = document.getElementById('inputArea').value.trim();
   const date = document.getElementById('dateInput').value;
   const msgEl = document.getElementById('saveMsg');
   const btn = document.getElementById('saveBtn');
-  if(!text){ msgEl.innerHTML='<div class="msg err">請先貼入持股資料</div>'; return; }
+
+  if(!parsedCSV){ msgEl.innerHTML='<div class="msg err">請先上傳 CSV 檔案</div>'; return; }
   if(!date){ msgEl.innerHTML='<div class="msg err">請選擇日期</div>'; return; }
-  const parsed = parseHoldings(text);
-  const count = Object.keys(parsed).length;
-  if(count < 3){ msgEl.innerHTML=`<div class="msg err">只解析到 ${count} 檔，請確認格式</div>`; return; }
+
+  const count = Object.keys(parsedCSV).length;
+  if(count < 3){ msgEl.innerHTML=`<div class="msg err">只解析到 ${count} 檔，請確認檔案格式</div>`; return; }
+
   btn.disabled = true;
   btn.textContent = '上傳中...';
   try {
-    await setDoc(doc(db, `holdings_${curETF}`, date), { date, holdings: parsed, count });
-    msgEl.innerHTML=`<div class="msg ok">上傳成功！解析到 ${count} 檔持股（${date}）已儲存至雲端</div>`;
+    await setDoc(doc(db, `holdings_${curETF}`, date), { date, holdings: parsedCSV, count });
+    msgEl.innerHTML=`<div class="msg ok">上傳成功！${count} 檔持股已儲存至雲端（${date}）</div>`;
+    clearUpload();
     await loadData();
   } catch(e) {
     msgEl.innerHTML='<div class="msg err">上傳失敗，請確認網路連線</div>';
@@ -444,7 +379,7 @@ window.delEntry = async function(date) {
   await loadData();
 };
 
-function renderSaved(){
+function renderSaved() {
   const el = document.getElementById('savedList');
   if(!cachedData.length){ el.innerHTML='<div class="empty">尚未儲存任何資料</div>'; return; }
   const isAdmin = curMode === 'admin';
@@ -455,7 +390,7 @@ function renderSaved(){
     </div>`).join('');
 }
 
-function updateSelects(){
+function updateSelects() {
   const opts = cachedData.map(d=>`<option value="${d.date}">${d.date}（${d.count}檔）</option>`).join('');
   document.getElementById('selA').innerHTML='<option value="">舊資料（基期）</option>'+opts;
   document.getElementById('selB').innerHTML='<option value="">新資料（比較）</option>'+opts;
@@ -463,19 +398,22 @@ function updateSelects(){
 
 // 比對
 window.compare = function() {
-  const dA=document.getElementById('selA').value, dB=document.getElementById('selB').value;
+  const dA=document.getElementById('selA').value;
+  const dB=document.getElementById('selB').value;
   const el=document.getElementById('resultArea');
   if(!dA||!dB){ el.innerHTML='<div class="msg err" style="margin-bottom:1rem">請選擇兩筆資料</div>'; return; }
   if(dA===dB){ el.innerHTML='<div class="msg err" style="margin-bottom:1rem">請選擇不同日期</div>'; return; }
-  const A=cachedData.find(d=>d.date===dA), B=cachedData.find(d=>d.date===dB);
+
+  const A=cachedData.find(d=>d.date===dA);
+  const B=cachedData.find(d=>d.date===dB);
   if(!A||!B){ el.innerHTML='<div class="msg err">找不到資料</div>'; return; }
 
   const old=A.holdings, now=B.holdings;
-  const allCodes=[...new Set([...Object.keys(old),...Object.keys(now)])];
+  const allKeys=[...new Set([...Object.keys(old),...Object.keys(now)])];
   const newIn=[],added=[],reduced=[],cleared=[];
 
-  for(const code of allCodes){
-    const o=old[code], n=now[code];
+  for(const key of allKeys){
+    const o=old[key], n=now[key];
     if(!o&&n) newIn.push({...n});
     else if(o&&!n) cleared.push({...o});
     else if(o&&n){
@@ -505,25 +443,25 @@ window.compare = function() {
 
   if(newIn.length){
     html+=`<div class="group-label label-new">新進 ${newIn.length} 檔</div>
-    <table><tr><th width="65">代號</th><th>名稱</th><th width="110">股數</th><th width="75">權重</th></tr>`;
+    <table><tr><th width="70">代號</th><th>名稱</th><th width="120">股數</th><th width="80">權重</th></tr>`;
     newIn.forEach(s=>{ html+=`<tr><td>${s.code}</td><td>${s.name}</td><td class="c-blue">${fmt(s.shares)}</td><td>${s.weight}%</td></tr>`; });
     html+='</table>';
   }
   if(added.length){
     html+=`<div class="group-label label-buy">加碼 ${added.length} 檔</div>
-    <table><tr><th width="65">代號</th><th>名稱</th><th width="100">舊股數</th><th width="100">新股數</th><th width="90">增加</th><th width="70">增幅</th></tr>`;
+    <table><tr><th width="70">代號</th><th>名稱</th><th width="110">舊股數</th><th width="110">新股數</th><th width="90">增加</th><th width="70">增幅</th></tr>`;
     added.forEach(s=>{ html+=`<tr><td>${s.code}</td><td>${s.name}</td><td class="c-muted">${fmt(s.oldShares)}</td><td>${fmt(s.shares)}</td><td class="c-green">+${fmt(s.diff)}</td><td class="c-green">${pct(s.oldShares,s.shares)}</td></tr>`; });
     html+='</table>';
   }
   if(reduced.length){
     html+=`<div class="group-label label-sell">減碼 ${reduced.length} 檔</div>
-    <table><tr><th width="65">代號</th><th>名稱</th><th width="100">舊股數</th><th width="100">新股數</th><th width="90">減少</th><th width="70">減幅</th></tr>`;
+    <table><tr><th width="70">代號</th><th>名稱</th><th width="110">舊股數</th><th width="110">新股數</th><th width="90">減少</th><th width="70">減幅</th></tr>`;
     reduced.forEach(s=>{ html+=`<tr><td>${s.code}</td><td>${s.name}</td><td class="c-muted">${fmt(s.oldShares)}</td><td>${fmt(s.shares)}</td><td class="c-red">${fmt(s.diff)}</td><td class="c-red">${pct(s.oldShares,s.shares)}</td></tr>`; });
     html+='</table>';
   }
   if(cleared.length){
     html+=`<div class="group-label label-clear">出清 ${cleared.length} 檔</div>
-    <table><tr><th width="65">代號</th><th>名稱</th><th width="110">舊股數</th><th width="75">舊權重</th></tr>`;
+    <table><tr><th width="70">代號</th><th>名稱</th><th width="120">舊股數</th><th width="80">舊權重</th></tr>`;
     cleared.forEach(s=>{ html+=`<tr><td>${s.code}</td><td>${s.name}</td><td class="c-amber">${fmt(s.shares)}</td><td>${s.weight}%</td></tr>`; });
     html+='</table>';
   }
@@ -534,11 +472,6 @@ window.compare = function() {
   el.innerHTML=html;
 };
 
-// 設定今天日期
-const d=new Date();
-document.getElementById('dateInput').value=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-
-// 初始載入
 loadData();
 </script>
 </body>
